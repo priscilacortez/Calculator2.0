@@ -74,7 +74,7 @@ struct CalculatorBrain {
     
     mutating func setOperand(_ operand: Double){
         sequenceOfOperations.append(OperationKeys.number(operand))
-        }
+    }
     
     mutating func setOperand(variable named: String){
         sequenceOfOperations.append(OperationKeys.variable(named))
@@ -82,7 +82,7 @@ struct CalculatorBrain {
     
     func evaluate(using variables: Dictionary<String, Double>? = nil) -> (result: Double?, isPending: Bool, description: String){
         
-        var result: (value: Double, description: String)? = nil
+        var pendingAccumulator: (value: Double, description: String)? = nil
         var accumulator: (value: Double, description: String)? = nil
         var pendingBinaryOperation: PendingBinaryOperation?
         
@@ -107,7 +107,7 @@ struct CalculatorBrain {
                         }
                         
                         pendingBinaryOperation = PendingBinaryOperation(function: function, firstOperand: accumulator!.value)
-                        result = accumulator
+                        pendingAccumulator = accumulator
                         accumulator = nil
                     }
                     
@@ -122,10 +122,10 @@ struct CalculatorBrain {
         
         func performPendingBinaryOperation(){
             if pendingBinaryOperation != nil && accumulator != nil {
-                accumulator!.description = "\(result!.description) \(accumulator!.description) "
+                accumulator!.description = "\(pendingAccumulator!.description) \(accumulator!.description) "
                 accumulator!.value = pendingBinaryOperation!.perform(with: accumulator!.value)
                 pendingBinaryOperation = nil
-                result = nil
+                pendingAccumulator = nil
             }
         }
         
@@ -146,7 +146,11 @@ struct CalculatorBrain {
             }
         }
         
-        return (accumulator?.value , pendingBinaryOperation != nil, result?.description ?? accumulator?.description ?? "")
+        let result = accumulator?.value
+        let isPending = {pendingBinaryOperation != nil}()
+        let description = pendingAccumulator?.description ?? accumulator?.description ?? ""
+        
+        return (result, isPending, description)
     }
     
     @available(*, deprecated)
@@ -182,8 +186,8 @@ struct CalculatorBrain {
     private func applyUnaryOperation(with symbol: String, on operationsMade: String ) -> String {
         if let writeComplexOperation = complexWrittenUnaryOperations[symbol]{
             return writeComplexOperation(operationsMade)
-            
         }
+        
         return "\(symbol) (\(operationsMade)) "
     }
 }

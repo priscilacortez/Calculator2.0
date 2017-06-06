@@ -48,15 +48,14 @@ class ViewController: UIViewController {
     }
     
     @IBAction func undo(_ sender: UIButton) {
+        // check to see if we have to do undo an operation instead of text typing
         guard display.text != nil && !display.text!.isEmpty && userIsInTheMiddleOfTyping else{
             display.text = "0"
             performOperation(sender)
             return
         }
         
-        if userIsInTheMiddleOfTyping && !display.text!.isEmpty{
-            display.text = display.text!.substring(to: display.text!.index(before: display.text!.endIndex))
-        }
+        display.text = display.text!.substring(to: display.text!.index(before: display.text!.endIndex))
         
         if display.text!.isEmpty{
             userIsInTheMiddleOfTyping = false
@@ -71,6 +70,7 @@ class ViewController: UIViewController {
         
         brain.setOperand(variable: sender.currentTitle!)
         
+        // show result so that users can't add additional digits after the varible
         showResult()
     }
     
@@ -91,9 +91,6 @@ class ViewController: UIViewController {
     }
     
     @IBAction func performOperation(_ sender: UIButton) {
-        print("performing operation")
-        
-        
         if userIsInTheMiddleOfTyping {
             brain.setOperand(displayValue)
             userIsInTheMiddleOfTyping = false
