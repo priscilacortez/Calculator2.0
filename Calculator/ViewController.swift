@@ -12,8 +12,21 @@ class ViewController: UIViewController {
     
     @IBOutlet weak var display: UILabel!
     @IBOutlet weak var operationsDisplay: UILabel!
+    @IBOutlet weak var variableDisplay: UILabel!
     
     var userIsInTheMiddleOfTyping = false
+    var variables: [String: Double]?
+    
+    private var brain = CalculatorBrain()
+    
+    var displayValue: Double {
+        get {
+            return Double(display.text!)!
+        }
+        set {
+            display.text = String(newValue)
+        }
+    }
     
     @IBAction func touchDigit(_ sender: UIButton) {
         let digit = sender.currentTitle!
@@ -34,16 +47,32 @@ class ViewController: UIViewController {
         }
     }
     
-    var displayValue: Double {
-        get {
-            return Double(display.text!)!
+    @IBAction func addVariable(_ sender: UIButton) {
+        if userIsInTheMiddleOfTyping {
+            brain.setOperand(displayValue)
+            userIsInTheMiddleOfTyping = false
         }
-        set {
-            display.text = String(newValue)
-        }
+        
+        brain.setOperand(variable: sender.currentTitle!)
+        
+        showResult()
     }
     
-    private var brain = CalculatorBrain()
+    @IBAction func evaluateVariable(_ sender: UIButton) {
+        userIsInTheMiddleOfTyping = false
+        let variable = "M"
+        let value = displayValue
+        
+        variableDisplay.text = "\(variable) = \(value)"
+        
+        if variables != nil {
+            variables![variable] = value
+        } else {
+            variables = [variable: value]
+        }
+        
+        showResult()
+    }
     
     @IBAction func performOperation(_ sender: UIButton) {
         if userIsInTheMiddleOfTyping {
@@ -56,10 +85,16 @@ class ViewController: UIViewController {
             
             if mathematicalSymbol == "C"{
                 display.text = "0"
+                variables = nil
+                variableDisplay.text = ""
             }
         }
         
-        let evaluation = brain.evaluate()
+        showResult()
+    }
+    
+    private func showResult(){
+        let evaluation = brain.evaluate(using: variables)
         
         if let result = evaluation.result {
             if result.truncatingRemainder(dividingBy: 1) == 0{
@@ -71,11 +106,11 @@ class ViewController: UIViewController {
         
         // set the operations display
         if evaluation.isPending {
-            operationsDisplay.text = brain.evaluate().description + " ..."
+            operationsDisplay.text = evaluation.description + " ..."
         } else if !evaluation.description.isEmpty {
-            operationsDisplay.text = brain.evaluate().description + " ="
+            operationsDisplay.text = evaluation.description + " ="
         } else {
-            operationsDisplay.text = brain.evaluate().description
+            operationsDisplay.text = evaluation.description
         }
     }
 }

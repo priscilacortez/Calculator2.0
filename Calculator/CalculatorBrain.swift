@@ -62,7 +62,9 @@ struct CalculatorBrain {
                 sequenceOfOperations = []
                 
             case .undo:
-                sequenceOfOperations.removeLast()
+                if !sequenceOfOperations.isEmpty {
+                    sequenceOfOperations.removeLast()
+                }
                 
             default:
                 sequenceOfOperations.append(OperationKeys.symbol(symbol))
