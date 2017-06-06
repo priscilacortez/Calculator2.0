@@ -59,7 +59,9 @@ class ViewController: UIViewController {
             }
         }
         
-        if let result = brain.result {
+        let evaluation = brain.evaluate()
+        
+        if let result = evaluation.result {
             if result.truncatingRemainder(dividingBy: 1) == 0{
                 display.text = String(Int(result))
             } else {
@@ -68,12 +70,12 @@ class ViewController: UIViewController {
         }
         
         // set the operations display
-        if brain.pendingResult {
-            operationsDisplay.text = brain.description + " ..."
-        } else if !brain.description.isEmpty {
-            operationsDisplay.text = brain.description + " ="
+        if evaluation.isPending {
+            operationsDisplay.text = brain.evaluate().description + " ..."
+        } else if !evaluation.description.isEmpty {
+            operationsDisplay.text = brain.evaluate().description + " ="
         } else {
-            operationsDisplay.text = brain.description
+            operationsDisplay.text = brain.evaluate().description
         }
     }
 }

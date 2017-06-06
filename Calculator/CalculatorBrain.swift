@@ -9,13 +9,14 @@
 import Foundation
 
 struct CalculatorBrain {
+
+    private var sequenceOfOperations = [OperationKeys]()
     
-    private var accumulator: (value: Double, text: String)?
-    private var pendingAccumulator: (value: Double, text: String)?
-    private var pendingBinaryOperation: PendingBinaryOperation?
-    private var allOperationsMade = ""
-    private var temporaryOperationMade = ""
-    private var constantToWrite = ""
+    private enum OperationKeys {
+        case number(Double)
+        case variable(String)
+        case symbol(String)
+    }
     
     private enum Operation {
         case constant(Double)
@@ -23,6 +24,7 @@ struct CalculatorBrain {
         case binaryOperation((Double, Double) -> Double)
         case equals
         case clear
+        case undo
     }
     
     private var operations : Dictionary<String, Operation> = [
@@ -32,93 +34,137 @@ struct CalculatorBrain {
         "cos"   : Operation.unaryOperation(cos),
         "sin"   : Operation.unaryOperation(sin),
         "±"     : Operation.unaryOperation({ -$0 }),
-        "1/x"   : Operation.unaryOperation({ 1/$0 }),
-        "x²"    : Operation.unaryOperation({ $0 * $0 }),
+        "x⁻¹"   : Operation.unaryOperation({ pow($0, -1) }),
+        "x⁻²"   : Operation.unaryOperation({ pow($0, -2) }),
+        "x²"    : Operation.unaryOperation({ pow($0, 2) }),
+        "x³"    : Operation.unaryOperation({ pow($0, 3) }),
         "×"     : Operation.binaryOperation({ $0 * $1 }),
         "÷"     : Operation.binaryOperation({ $0 / $1 }),
         "+"     : Operation.binaryOperation({ $0 + $1 }),
         "-"     : Operation.binaryOperation({ $0 - $1 }),
         "="     : Operation.equals,
-        "C"     : Operation.clear
+        "C"     : Operation.clear,
+        "←"     : Operation.undo
     ]
     
     private var complexWrittenUnaryOperations : Dictionary<String, (String) -> String> = [
-        "1/x"   : {"1/(\($0))"},
+        "x⁻¹"   : {"(\($0))⁻¹"},
+        "x⁻²"   : {"(\($0))⁻²"},
         "x²"    : {"(\($0))²"},
+        "x³"    : {"(\($0))³"}
     ]
     
     mutating func performOperation(_ symbol: String){
         
         if let operation = operations[symbol]{
             switch operation {
-            case .constant(let value):
-                accumulator = (value, "\(symbol)")
-            
-            case .unaryOperation(let function):
-                if accumulator != nil {
-                    accumulator = (function(accumulator!.value), applyUnaryOperation(with: symbol, on: accumulator!.text))
-                }
-            
-            case .binaryOperation(let function):
-                if accumulator != nil {
-                    accumulator!.text += " \(symbol) "
-                    
-                    // perform binary operation with current accumulater if we already had one pending
-                    if pendingBinaryOperation != nil {
-                        performPendingBinaryOperation()
-                    } 
-                    
-                    pendingBinaryOperation = PendingBinaryOperation(function: function, firstOperand: accumulator!.value)
-                    pendingAccumulator = accumulator
-                    accumulator = nil
-                }
-            
-            case .equals:
-                performPendingBinaryOperation()
-                
             case .clear:
-                pendingBinaryOperation = nil
-                accumulator = nil
-                pendingAccumulator = nil
+                sequenceOfOperations = []
+                
+            case .undo:
+                sequenceOfOperations.removeLast()
+                
+            default:
+                sequenceOfOperations.append(OperationKeys.symbol(symbol))
             }
         }
     }
     
     mutating func setOperand(_ operand: Double){
-        // sets accumulator and removes trailing .0 if an integer to the text
-        accumulator = (operand, operand.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(operand)) : String(operand))
-    }
+        sequenceOfOperations.append(OperationKeys.number(operand))
+        }
     
     mutating func setOperand(variable named: String){
-        accumulator = (0, named)
+        sequenceOfOperations.append(OperationKeys.variable(named))
     }
     
     func evaluate(using variables: Dictionary<String, Double>? = nil) -> (result: Double?, isPending: Bool, description: String){
         
+        var result: (value: Double, description: String)? = nil
+        var accumulator: (value: Double, description: String)? = nil
+        var pendingBinaryOperation: PendingBinaryOperation?
+        
+        func evaluateResult(using symbol: String){
+            if let operation = operations[symbol]{
+                switch operation {
+                case .constant(let value):
+                    accumulator = (value, "\(symbol)")
+                    
+                case .unaryOperation(let function):
+                    if accumulator != nil {
+                        accumulator = (function(accumulator!.value), applyUnaryOperation(with: symbol, on: accumulator!.description))
+                    }
+                    
+                case .binaryOperation(let function):
+                    if accumulator != nil {
+                        accumulator!.description += " \(symbol)"
+                        
+                        // perform binary operation with current acumulater if we already had one pending
+                        if pendingBinaryOperation != nil {
+                            performPendingBinaryOperation()
+                        }
+                        
+                        pendingBinaryOperation = PendingBinaryOperation(function: function, firstOperand: accumulator!.value)
+                        result = accumulator
+                        accumulator = nil
+                    }
+                    
+                case .equals:
+                    performPendingBinaryOperation()
+                    
+                default:
+                    break
+                }
+            }
+        }
+        
+        func performPendingBinaryOperation(){
+            if pendingBinaryOperation != nil && accumulator != nil {
+                accumulator!.description = "\(result!.description) \(accumulator!.description) "
+                accumulator!.value = pendingBinaryOperation!.perform(with: accumulator!.value)
+                pendingBinaryOperation = nil
+                result = nil
+            }
+        }
+        
+        
+        for operation in sequenceOfOperations {
+            switch(operation){
+            case .variable(let variable):
+                // sets accumulator and description of variable
+                let variableValue = variables?[variable] ?? 0
+                accumulator = (variableValue, variable)
+                
+            case .number(let value):
+                // sets accumulator and removes trailing .0 if an integer to the text
+                accumulator = (value, value.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(value)) : String(value))
+                
+            case .symbol(let symbol):
+                evaluateResult(using: symbol)
+            }
+        }
+        
+        return (accumulator?.value , pendingBinaryOperation != nil, result?.description ?? accumulator?.description ?? "")
     }
     
+    @available(*, deprecated)
     var result: Double? {
         get {
-            return accumulator?.value
+            return evaluate().result
         }
     }
     
+    @available(*, deprecated)
     var pendingResult: Bool {
         get {
-            if pendingBinaryOperation != nil {
-                return true
-            }
-            return false
+            return evaluate().isPending
         }
     }
     
+    @available(*, deprecated)
     var description: String {
         get {
-            guard pendingAccumulator != nil || accumulator != nil else {
-                return ""
-            }
-            
-            return pendingAccumulator?.text ?? accumulator!.text
+            return evaluate().description
         }
     }
     
@@ -131,20 +177,11 @@ struct CalculatorBrain {
         }
     }
     
-    private mutating func applyUnaryOperation(with symbol: String, on operationsMade: String ) -> String {
+    private func applyUnaryOperation(with symbol: String, on operationsMade: String ) -> String {
         if let writeComplexOperation = complexWrittenUnaryOperations[symbol]{
             return writeComplexOperation(operationsMade)
             
         }
         return "\(symbol) (\(operationsMade)) "
-    }
-    
-    private mutating func performPendingBinaryOperation(){
-        if pendingBinaryOperation != nil && accumulator != nil {
-            accumulator!.text = "\(pendingAccumulator!.text) \(accumulator!.text) "
-            accumulator!.value = pendingBinaryOperation!.perform(with: accumulator!.value)
-            pendingBinaryOperation = nil
-            pendingAccumulator = nil
-        }
     }
 }
