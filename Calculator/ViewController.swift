@@ -47,6 +47,22 @@ class ViewController: UIViewController {
         }
     }
     
+    @IBAction func undo(_ sender: UIButton) {
+        guard display.text != nil && !display.text!.isEmpty && userIsInTheMiddleOfTyping else{
+            display.text = "0"
+            performOperation(sender)
+            return
+        }
+        
+        if userIsInTheMiddleOfTyping && !display.text!.isEmpty{
+            display.text = display.text!.substring(to: display.text!.index(before: display.text!.endIndex))
+        }
+        
+        if display.text!.isEmpty{
+            userIsInTheMiddleOfTyping = false
+        }
+    }
+    
     @IBAction func addVariable(_ sender: UIButton) {
         if userIsInTheMiddleOfTyping {
             brain.setOperand(displayValue)
@@ -75,6 +91,9 @@ class ViewController: UIViewController {
     }
     
     @IBAction func performOperation(_ sender: UIButton) {
+        print("performing operation")
+        
+        
         if userIsInTheMiddleOfTyping {
             brain.setOperand(displayValue)
             userIsInTheMiddleOfTyping = false
